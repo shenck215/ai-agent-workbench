@@ -1,16 +1,16 @@
 import { calculatorTool } from "./calculator";
 import { getStockTool } from "./stock";
 
-export function runTool(toolCall: string) {
-  // format: calculator:2+3
-  if (toolCall.startsWith("calculator:")) {
-    return calculatorTool(toolCall.replace("calculator:", ""));
+export function runTool(tool: string | null) {
+  if (!tool) return null;
+
+  if (tool.startsWith("calculator:")) {
+    return calculatorTool(tool.replace("calculator:", ""));
   }
 
-  // format: stock:AAPL
-  if (toolCall.startsWith("stock:")) {
-    return getStockTool(toolCall.replace("stock:", ""));
+  if (tool.startsWith("stock:")) {
+    return getStockTool(tool.replace("stock:", ""));
   }
 
-  return "unknown tool";
+  return null;
 }

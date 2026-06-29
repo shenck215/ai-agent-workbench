@@ -1,9 +1,12 @@
-export function calculatorTool(input: string) {
+export function calculatorTool(expr: string) {
   try {
-    // ⚠️ demo 用，生产不要这样写
-    const result = Function(`return (${input})`)();
+    const safe = /^[0-9+\-*/().\s]+$/.test(expr);
+    if (!safe) return "invalid expression";
+
+    const result = new Function(`return (${expr})`)();
+
     return String(result);
-  } catch (e) {
-    return "calculator error";
+  } catch {
+    return "calc error";
   }
 }

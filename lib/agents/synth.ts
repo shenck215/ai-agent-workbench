@@ -1,42 +1,40 @@
-import type OpenAI from "openai";
+import { safeChatCompletion } from "@/lib/ai/safeOpenAI";
+import type { SynthAgentPayload } from "@/lib/types";
+import { SYNTH_PROMPT } from "../prompts/version";
 
-// 🧠 Synthesizer Agent
 export async function synthAgent(
-  openai: OpenAI,
-  input: string,
-  bull: string,
-  bear: string,
-  neutral: string,
-) {
-  const res = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
+  payload: SynthAgentPayload,
+): Promise<string | null> {
+  const { input, bull, bear, neutral, conflict, decision } = payload;
+
+  return await safeChatCompletion({
     messages: [
       {
         role: "system",
-        content: "你是决策整合专家，需要综合多个观点，输出结论、风险和建议。",
+        content: SYNTH_PROMPT,
       },
       {
         role: "user",
         content: `
-问题：${input}
+用户问题：
+${input}
 
-看多观点：
-${bull}
+conflict:
+${JSON.stringify(conflict)}
 
-看空观点：
-${bear}
+decision:
+${JSON.stringify(decision)}
 
-中性观点：
-${neutral}
+Bull:
+${JSON.stringify(bull)}
 
-请输出：
-1. 结论
-2. 风险
-3. 建议
+Bear:
+${JSON.stringify(bear)}
+
+Neutral:
+${JSON.stringify(neutral)}
         `,
       },
     ],
   });
-
-  return res.choices[0].message.content;
 }

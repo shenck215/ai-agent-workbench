@@ -1,8 +1,13 @@
 export function getStockTool(symbol: string) {
-  const db: Record<string, object> = {
-    AAPL: { price: 180, pe: 28, trend: "up" },
-    TSLA: { price: 240, pe: 65, trend: "volatile" },
+  type StockSnapshot = {
+    price: number;
+    pe: number;
   };
 
-  return db[symbol] || { price: 100, pe: 20, trend: "unknown" };
+  const db: Record<string, StockSnapshot> = {
+    AAPL: { price: 180, pe: 28 },
+    TSLA: { price: 240, pe: 65 },
+  };
+
+  return db[symbol] || { price: 100, pe: 20 };
 }

@@ -1,32 +1,14 @@
-import type OpenAI from "openai";
+import { safeChatCompletion } from "@/lib/ai/safeOpenAI";
+import { BULL_PROMPT } from "../prompts/version";
 
-// 🐂 Bull Agent
-export async function bullAgent(openai: OpenAI, input: string) {
-  const res = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
+export async function bullAgent(input: string) {
+  return await safeChatCompletion({
     messages: [
       {
         role: "system",
-        content: `
-你是投资分析Agent。
-
-如果你需要数据，请输出：
-
-TOOL: toolName:input
-
-可用工具：
-- calculator
-- stock
-
-否则直接回答。
-        `,
+        content: BULL_PROMPT,
       },
-      {
-        role: "user",
-        content: input,
-      },
+      { role: "user", content: input },
     ],
   });
-
-  return res.choices[0].message.content;
 }
