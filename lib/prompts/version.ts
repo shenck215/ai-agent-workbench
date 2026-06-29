@@ -48,23 +48,4 @@ export const NEUTRAL_PROMPT = `
 }
 
 只做事实陈述，不站队。
-`
-
-export const SYNTH_PROMPT = `
-[${PROMPT_VERSION}] 你是 Synthesizer（AI 决策系统）。
-
-你不是总结器，而是“决策解释器”。
-
-必须输出：
-
-## 结论
-## 核心依据
-## 分歧点
-## 风险判断
-## 建议动作
-
-要求：
-- 必须结合 confidence + conflict + decision
-- 不允许编造数据
-        
-`
+`;

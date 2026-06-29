@@ -6,6 +6,8 @@ import { runTool } from "@/lib/tools/router";
 import { synthAgent } from "@/lib/agents/synth";
 import { ComputeDecisionResult, DetectConflictResult } from "../types";
 import { log } from "@/lib/telemetry/logger";
+import { saveMemory, getMemory } from "@/lib/memory/store";
+import { queryStock, type StockKnowledgeHit } from "@/lib/rag/query";
 
 type AgentOutput = {
   thought: string;
@@ -64,16 +66,31 @@ function computeDecision(
   };
 }
 
+function buildAgentInput(input: string, rag: StockKnowledgeHit | null) {
+  if (!rag) return input;
+
+  return `${input}
+
+---
+RAG context:
+${JSON.stringify(rag, null, 2)}`;
+}
+
 export async function runOrchestrator(input: string) {
   // 🧠 1. agents
   log({ type: "agent_start", agent: "bull", input });
   log({ type: "agent_start", agent: "bear", input });
   log({ type: "agent_start", agent: "neutral", input });
 
+  const rag = queryStock(input);
+  const agentInput = buildAgentInput(input, rag);
+
+  log({ type: "rag", input, output: rag });
+
   const [bullRaw, bearRaw, neutralRaw] = await Promise.all([
-    bullAgent(input),
-    bearAgent(input),
-    neutralAgent(input),
+    bullAgent(agentInput),
+    bearAgent(agentInput),
+    neutralAgent(agentInput),
   ]);
 
   const bull = safeParse(bullRaw);
@@ -118,6 +135,10 @@ export async function runOrchestrator(input: string) {
 
   log({ type: "decision", data: { conflict, decision } });
 
+  const history = getMemory(input);
+
+  log({ type: "memory", input, output: history });
+
   // 🧠 4. synth layer（解释层）
   const final = await synthAgent({
     input,
@@ -126,6 +147,14 @@ export async function runOrchestrator(input: string) {
     neutral: { ...neutral, toolResult: neutralTool },
     conflict,
     decision,
+    memory: history,
+  });
+
+  saveMemory({
+    input,
+    decision: decision.decision,
+    timestamp: Date.now(),
+    tags: rag ? [rag.symbol, rag.name, ...rag.aliases] : [],
   });
 
   log({ type: "synth", output: final });
@@ -141,6 +170,7 @@ export async function runOrchestrator(input: string) {
     },
     conflict,
     decision,
+    rag,
     final,
   };
 }

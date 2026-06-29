@@ -34,6 +34,11 @@ export default function Page() {
     setDecision(null);
     setConflict(null);
     setLogs([]);
+    setAgents({
+      bull: null,
+      bear: null,
+      neutral: null,
+    });
 
     try {
       const res = await fetch("/api/agents", {

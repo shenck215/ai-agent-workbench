@@ -1,4 +1,6 @@
 import type { LogEvent } from "@/lib/telemetry/logger";
+import type { MemoryItem } from "@/lib/memory/store";
+import type { StockKnowledgeHit } from "@/lib/rag/query";
 
 export type AgentName = "bull" | "bear" | "neutral";
 
@@ -84,6 +86,7 @@ export type SynthAgentPayload = {
   neutral: AgentOutputWithToolResult;
   conflict: DetectConflictResult;
   decision: ComputeDecisionResult;
+  memory: MemoryItem[];
 };
 
 export type AgentsApiResponse = {
@@ -93,6 +96,7 @@ export type AgentsApiResponse = {
   tools: Record<AgentName, unknown | null>;
   conflict: DetectConflictResult;
   decision: ComputeDecisionResult;
+  rag: StockKnowledgeHit | null;
   final: string | null;
   logs: LogEvent[];
 };

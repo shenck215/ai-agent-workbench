@@ -24,6 +24,16 @@ export type LogEvent =
       data: unknown;
     }
   | {
+      type: "rag";
+      input: string;
+      output: unknown;
+    }
+  | {
+      type: "memory";
+      input: string;
+      output: unknown;
+    }
+  | {
       type: "synth";
       output: string | null;
     };
