@@ -11,11 +11,13 @@ export type LogEvent =
     }
   | {
       type: "tool_call";
+      agent: string;
       tool: string;
       input: string;
     }
   | {
       type: "tool_result";
+      agent: string;
       tool: string;
       output: unknown;
     }
