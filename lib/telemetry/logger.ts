@@ -1,5 +1,9 @@
 export type LogEvent =
   | {
+      type: "planner";
+      plan: unknown;
+    }
+  | {
       type: "agent_start";
       agent: string;
       input: string;

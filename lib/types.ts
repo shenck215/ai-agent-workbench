@@ -1,5 +1,6 @@
 import type { LogEvent } from "@/lib/telemetry/logger";
 import type { MemoryItem } from "@/lib/memory/store";
+import type { Plan } from "@/lib/planner/planner";
 import type { StockKnowledgeHit } from "@/lib/rag/query";
 
 export type AgentName = "bull" | "bear" | "neutral";
@@ -58,6 +59,10 @@ export type AgentOutputWithToolResult = AgentOutput & {
   toolResult: unknown | null;
 };
 
+export type AgentOutputMap = Record<AgentName, AgentOutput>;
+
+export type ToolResultMap = Record<AgentName, unknown | null>;
+
 export type SynthApiResponse = {
   bull: AgentRun;
   bear: AgentRun;
@@ -86,17 +91,23 @@ export type SynthAgentPayload = {
   neutral: AgentOutputWithToolResult;
   conflict: DetectConflictResult;
   decision: ComputeDecisionResult;
+  rag: StockKnowledgeHit | null;
+  tools: ToolResultMap;
   memory: MemoryItem[];
 };
 
 export type AgentsApiResponse = {
+  plan: Plan;
   bull: AgentOutput;
   bear: AgentOutput;
   neutral: AgentOutput;
-  tools: Record<AgentName, unknown | null>;
+  agents: AgentOutputMap;
+  tools: ToolResultMap;
+  toolResults: ToolResultMap;
   conflict: DetectConflictResult;
   decision: ComputeDecisionResult;
   rag: StockKnowledgeHit | null;
+  memory: MemoryItem[];
   final: string | null;
   logs: LogEvent[];
 };

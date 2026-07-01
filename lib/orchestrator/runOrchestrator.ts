@@ -1,188 +1,87 @@
-import { bullAgent } from "@/lib/agents/bull";
-import { bearAgent } from "@/lib/agents/bear";
-import { neutralAgent } from "@/lib/agents/neutral";
-
-import { runTool } from "@/lib/tools/router";
-import { synthAgent } from "@/lib/agents/synth";
-import { fallbackAgentOutput, parseAgentOutput } from "@/lib/agents/agentOutput";
-
+import { createPlan } from "@/lib/planner/planner";
+import { runAgents } from "@/services/agent.service";
+import { runTools } from "@/services/tool.service";
+import { runRag } from "@/services/rag.service";
+import { detectConflict, runDecision } from "@/services/decision.service";
+import { runSynth } from "@/services/synth.service";
+import { getMemory, saveMemory } from "@/lib/memory/store";
 import { log } from "@/lib/telemetry/logger";
 import { recordEval } from "@/lib/eval/evaluator";
-import { getMemory, saveMemory } from "@/lib/memory/store";
-import { queryStock, type StockKnowledgeHit } from "@/lib/rag/query";
-import type {
-  AgentName,
-  AgentOutput,
-  ComputeDecisionResult,
-  DetectConflictResult,
-} from "@/lib/types";
+import type { ToolResultMap } from "@/lib/types";
 
-/**
- * 安全解析 LLM 输出
- */
-function safeParse(raw: string | null): AgentOutput {
-  return parseAgentOutput(raw) ?? fallbackAgentOutput(raw);
-}
-
-/**
- * 冲突检测
- */
-function detectConflict(bull: number, bear: number): DetectConflictResult {
-  const diff = Math.abs(bull - bear);
-
-  return {
-    conflict: diff > 0.3,
-    level: diff > 0.5 ? "high" : diff > 0.3 ? "medium" : "low",
-  };
-}
-
-/**
- * 决策计算（简单加权）
- */
-function computeDecision(
-  bull: AgentOutput,
-  bear: AgentOutput,
-): ComputeDecisionResult {
-  const score = bull.confidence - bear.confidence;
-
-  return {
-    score,
-    decision:
-      score > 0.2
-        ? "偏看多"
-        : score < -0.2
-        ? "偏看空"
-        : "中性",
-  };
-}
-
-/**
- * tool 执行
- */
-function executeTool(agent: AgentName, tool: string | null) {
-  const toolCall = tool || "none";
-
-  log({ type: "tool_call", agent, tool: toolCall, input: toolCall });
-
-  const result = tool ? runTool(tool) : null;
-
-  log({ type: "tool_result", agent, tool: toolCall, output: result });
-
-  return result;
-}
-
-function buildAgentInput(input: string, rag: StockKnowledgeHit | null) {
-  if (!rag) return input;
-
-  return `${input}
-
----
-RAG context:
-${JSON.stringify(rag, null, 2)}`;
-}
-
-/**
- * 核心 Orchestrator
- */
 export async function runOrchestrator(input: string) {
-  // =========================
-  // 1. log start
-  // =========================
-  log({ type: "agent_start", agent: "bull", input });
-  log({ type: "agent_start", agent: "bear", input });
-  log({ type: "agent_start", agent: "neutral", input });
+  // 🧠 1. planner
+  const plan = createPlan(input);
 
-  const rag = queryStock(input);
-  const agentInput = buildAgentInput(input, rag);
+  log({ type: "planner", plan });
 
-  log({ type: "rag", input, output: rag });
+  // 🧠 2. rag
+  const ragContext = plan.useRag ? await runRag(input) : null;
 
-  // =========================
-  // 2. run agents (parallel)
-  // =========================
-  const [bullRaw, bearRaw, neutralRaw] = await Promise.all([
-    bullAgent(agentInput),
-    bearAgent(agentInput),
-    neutralAgent(agentInput),
-  ]);
+  // 🧠 3. agents
+  const agents = await runAgents(input, plan, ragContext);
 
-  // =========================
-  // 3. parse outputs
-  // =========================
-  const bull = safeParse(bullRaw);
-  const bear = safeParse(bearRaw);
-  const neutral = safeParse(neutralRaw);
+  // 🧠 4. tools
+  const emptyToolResults: ToolResultMap = {
+    bull: null,
+    bear: null,
+    neutral: null,
+  };
+  const toolResults = plan.useTools ? await runTools(agents) : emptyToolResults;
 
-  log({ type: "agent_end", agent: "bull", output: bull });
-  log({ type: "agent_end", agent: "bear", output: bear });
-  log({ type: "agent_end", agent: "neutral", output: neutral });
-
-  // =========================
-  // 4. tool execution
-  // =========================
-  const bullTool = executeTool("bull", bull.tool);
-  const bearTool = executeTool("bear", bear.tool);
-  const neutralTool = executeTool("neutral", neutral.tool);
-
-  // =========================
-  // 5. decision layer
-  // =========================
-  const conflict = detectConflict(bull.confidence, bear.confidence);
-  const decision = computeDecision(bull, bear);
+  // 🧠 5. memory
   const memory = getMemory(input);
 
-  log({ type: "decision", data: decision });
   log({ type: "memory", input, output: memory });
 
-  // =========================
-  // 6. synth layer
-  // =========================
-  const final = await synthAgent({
+  // 🧠 6. decision
+  const conflict = detectConflict(agents);
+  const decision = runDecision(agents);
+
+  log({ type: "decision", data: decision });
+
+  // 🧠 7. synth
+  const final = await runSynth({
     input,
-    bull: { ...bull, toolResult: bullTool },
-    bear: { ...bear, toolResult: bearTool },
-    neutral: { ...neutral, toolResult: neutralTool },
+    agents,
+    toolResults,
     conflict,
     decision,
+    ragContext,
     memory,
   });
 
   log({ type: "synth", output: final });
 
-  // =========================
-  // 7. memory / learning
-  // =========================
+  // 🧠 8. memory write-back
   saveMemory({
     input,
     decision: decision.decision,
     timestamp: Date.now(),
-    tags: rag ? [rag.symbol, rag.name, ...rag.aliases] : [],
+    tags: ragContext
+      ? [ragContext.symbol, ragContext.name, ...ragContext.aliases]
+      : [],
   });
 
   recordEval({
     input,
     decision: decision.decision,
-    bullConfidence: bull.confidence,
-    bearConfidence: bear.confidence,
+    bullConfidence: agents.bull.confidence,
+    bearConfidence: agents.bear.confidence,
   });
 
-  // =========================
-  // 8. return result
-  // =========================
   return {
-    bull,
-    bear,
-    neutral,
-
-    tools: {
-      bull: bullTool,
-      bear: bearTool,
-      neutral: neutralTool,
-    },
-
+    plan,
+    bull: agents.bull,
+    bear: agents.bear,
+    neutral: agents.neutral,
+    agents,
+    tools: toolResults,
+    toolResults,
     conflict,
     decision,
-    rag,
+    rag: ragContext,
+    memory,
     final,
   };
 }

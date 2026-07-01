@@ -48,6 +48,10 @@ export default function Page() {
   const [conflict, setConflict] = useState<
     AgentsApiResponse["conflict"] | null
   >(null);
+  const [plan, setPlan] = useState<AgentsApiResponse["plan"] | null>(null);
+  const [rag, setRag] = useState<AgentsApiResponse["rag"]>(null);
+  const [tools, setTools] = useState<AgentsApiResponse["tools"] | null>(null);
+  const [memory, setMemory] = useState<AgentsApiResponse["memory"]>([]);
 
   const [logs, setLogs] = useState<AgentsApiResponse["logs"]>([]);
 
@@ -63,6 +67,10 @@ export default function Page() {
     setFinal(null);
     setDecision(null);
     setConflict(null);
+    setPlan(null);
+    setRag(null);
+    setTools(null);
+    setMemory([]);
     setLogs([]);
     setError(null);
     setAgents({
@@ -101,6 +109,10 @@ export default function Page() {
       setFinal(data.final);
       setDecision(data.decision);
       setConflict(data.conflict);
+      setPlan(data.plan);
+      setRag(data.rag);
+      setTools(data.tools);
+      setMemory(data.memory || []);
       setLogs(data.logs || []);
 
       setAgents({
@@ -242,6 +254,20 @@ export default function Page() {
       {/* ========================= */}
       <details style={debugDetails}>
         <summary style={debugSummary}>
+          <span>🧭 Orchestration Bus</span>
+          <span style={debugSummaryHint}>Planner / RAG / Tools / Memory</span>
+        </summary>
+
+        <div style={debugGrid}>
+          <DebugJsonCard title="Planner" value={plan} />
+          <DebugJsonCard title="RAG" value={rag} />
+          <DebugJsonCard title="Tools" value={tools} />
+          <DebugJsonCard title="Memory" value={memory} />
+        </div>
+      </details>
+
+      <details style={debugDetails}>
+        <summary style={debugSummary}>
           <span>🧪 Agent Debug</span>
           <span style={debugSummaryHint}>开发者模式</span>
         </summary>
@@ -267,21 +293,70 @@ export default function Page() {
       {/* ========================= */}
       {/* Logs（核心升级点） */}
       {/* ========================= */}
-      <details style={{ marginTop: 20 }}>
-        <summary style={{ cursor: "pointer" }}>
-          🧠 AI Execution Logs（可回放）
+      <details style={debugDetails}>
+        <summary style={debugSummary}>
+          <span>🧠 AI Execution Logs</span>
+          <span style={debugSummaryHint}>可回放</span>
+          <span style={logCountBadge}>{logs.length}</span>
         </summary>
 
-        <div style={{ marginTop: 12 }}>
-          {logs.map((l, i) => (
-            <div key={i} style={{ marginBottom: 6 }}>
-              <code>{l.type}</code> —{" "}
-              <span style={{ color: "#666" }}>{JSON.stringify(l)}</span>
-            </div>
-          ))}
+        <div style={logList}>
+          {logs.length > 0 ? (
+            logs.map((logItem, index) => (
+              <LogEventCard key={`${logItem.type}-${index}`} event={logItem} />
+            ))
+          ) : (
+            <div style={emptyLogState}>No execution logs yet.</div>
+          )}
         </div>
       </details>
     </div>
+  );
+}
+
+function LogEventCard({
+  event,
+}: {
+  event: AgentsApiResponse["logs"][number];
+}) {
+  const eventAgent = "agent" in event ? event.agent : null;
+  const eventTool = "tool" in event ? event.tool : null;
+
+  return (
+    <section style={logCard}>
+      <div style={debugCardHeader}>
+        <div style={debugAgentTitle}>
+          <span style={{ ...debugAgentIcon, background: "#e0f2fe" }}>↳</span>
+          <span>{event.type}</span>
+        </div>
+
+        <div style={logMetaRow}>
+          {eventAgent && <span style={logMetaBadge}>{eventAgent}</span>}
+          {eventTool && <span style={logMetaBadge}>{eventTool}</span>}
+        </div>
+      </div>
+
+      <pre style={logJson}>{JSON.stringify(event, null, 2)}</pre>
+    </section>
+  );
+}
+
+function DebugJsonCard({ title, value }: { title: string; value: unknown }) {
+  return (
+    <section style={debugCard}>
+      <div style={debugCardHeader}>
+        <div style={debugAgentTitle}>
+          <span style={{ ...debugAgentIcon, background: "#f1f5f9" }}>•</span>
+          <span>{title}</span>
+        </div>
+      </div>
+
+      <pre style={rawJson}>
+        {value === null || value === undefined
+          ? "null"
+          : JSON.stringify(value, null, 2)}
+      </pre>
+    </section>
   );
 }
 
@@ -388,6 +463,73 @@ const debugGrid: CSSProperties = {
   gap: 12,
   padding: 12,
   alignItems: "stretch",
+};
+
+const logList: CSSProperties = {
+  display: "grid",
+  gap: 10,
+  padding: 12,
+};
+
+const logCard: CSSProperties = {
+  minWidth: 0,
+  border: "1px solid #e5e7eb",
+  borderRadius: 8,
+  padding: 12,
+  background: "#ffffff",
+  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+};
+
+const logCountBadge: CSSProperties = {
+  marginLeft: "auto",
+  borderRadius: 999,
+  padding: "3px 8px",
+  background: "#e0f2fe",
+  color: "#0369a1",
+  fontSize: 12,
+  fontWeight: 700,
+};
+
+const logMetaRow: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+  gap: 6,
+  minWidth: 0,
+};
+
+const logMetaBadge: CSSProperties = {
+  borderRadius: 999,
+  padding: "3px 7px",
+  background: "#f1f5f9",
+  color: "#475569",
+  fontFamily: "var(--font-mono)",
+  fontSize: 11,
+  fontWeight: 700,
+};
+
+const logJson: CSSProperties = {
+  margin: 0,
+  maxHeight: 160,
+  overflow: "auto",
+  borderRadius: 8,
+  padding: 10,
+  background: "#f8fafc",
+  color: "#334155",
+  fontFamily: "var(--font-mono)",
+  fontSize: 12,
+  lineHeight: 1.55,
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+};
+
+const emptyLogState: CSSProperties = {
+  border: "1px dashed #cbd5e1",
+  borderRadius: 8,
+  padding: 18,
+  color: "#64748b",
+  fontSize: 13,
+  textAlign: "center",
 };
 
 const debugCard: CSSProperties = {

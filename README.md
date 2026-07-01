@@ -1,5 +1,6 @@
-# 多 Agent 投研系统
-Built a production-grade multi-agent AI decision system with separated product layer and developer observability layer.
+# Multi-Agent Investment Research System
+
+Designed a modular AI agent system with planner-based orchestration, separated service layers, and decoupled reasoning/execution/synthesis pipeline.
 
 ## Getting Started
 
@@ -17,15 +18,16 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Wrokflow
+## Workflow
+
+```text
 Product UI Layer
-   ↓
-Synth (AI explanation engine)
-   ↓
-Decision engine
-   ↓
-Multi-Agent system
-   ↓
-Tool system
-   ↓
-Logging system (replayable)
+  -> POST /api/agents
+  -> Planner
+  -> Orchestration Bus
+  -> Agents + Tools + RAG
+  -> Memory Store
+  -> Decision Engine + Conflict Detection
+  -> Synth Layer
+  -> Logging system
+```

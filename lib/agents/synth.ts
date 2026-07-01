@@ -4,7 +4,8 @@ import type { SynthAgentPayload } from "@/lib/types";
 export async function synthAgent(
   payload: SynthAgentPayload,
 ): Promise<string | null> {
-  const { input, bull, bear, neutral, conflict, decision, memory } = payload;
+  const { input, bull, bear, neutral, conflict, decision, rag, tools, memory } =
+    payload;
 
   return await safeChatCompletion({
     messages: [
@@ -46,6 +47,12 @@ ${JSON.stringify(conflict)}
 
 decision:
 ${JSON.stringify(decision)}
+
+rag:
+${JSON.stringify(rag)}
+
+tools:
+${JSON.stringify(tools)}
 
 Bull:
 ${JSON.stringify(bull)}

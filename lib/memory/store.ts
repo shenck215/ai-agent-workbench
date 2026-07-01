@@ -38,13 +38,34 @@ function scoreMemory(query: string, item: MemoryItem) {
 }
 
 export function getMemory(input: string, limit = 5) {
-  return memory
+  const ranked = memory
     .map((item) => ({
       item,
       score: scoreMemory(input, item),
     }))
-    .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score || b.item.timestamp - a.item.timestamp)
+
+  const matched = ranked
+    .filter(({ score }) => score > 0)
     .slice(0, limit)
     .map(({ item }) => item);
+
+  if (matched.length >= limit) return matched;
+
+  const matchedTimestamps = new Set(matched.map((item) => item.timestamp));
+  const recentBackfill = getRecentMemory(limit)
+    .filter((item) => !matchedTimestamps.has(item.timestamp))
+    .slice(0, limit - matched.length);
+
+  return [...matched, ...recentBackfill];
+}
+
+export function getRecentMemory(limit = 10) {
+  return [...memory]
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, limit);
+}
+
+export function getMemoryCount() {
+  return memory.length;
 }
